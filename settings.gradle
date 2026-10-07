@@ -1,0 +1,2 @@
+pluginManagement { repositories { maven { name='Forge'; url='https://maven.minecraftforge.net/' }; gradlePluginPortal(); mavenCentral() } }
+rootProject.name='minenorth-accueil'

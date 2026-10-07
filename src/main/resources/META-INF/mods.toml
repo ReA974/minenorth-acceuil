@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+[[mods]]
+modId="minenorthaccueil"
+version="1.0.0"
+displayName="MineNorth Accueil Police"
+authors="MineNorth RP"
+description='''Accueil du commissariat : plaintes, objets trouvés, fourrière.''' 
+[[dependencies.minenorthaccueil]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.minenorthaccueil]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.minenorthaccueil]]
+modId="minenorthapi"
+mandatory=true
+versionRange="[1.0.0,2)"
+ordering="AFTER"
+side="BOTH"
