@@ -7,12 +7,15 @@ Optionnels, détectés automatiquement : Véhicules (fourrière), Identité (nom
 `/policeaccueil <joueur>` (console / OP — à donner au PNJ) : porter plainte, prendre rendez-vous avec un policier, voir ses véhicules en fourrière, déposer un objet trouvé.
 Le paiement des amendes du script n'a pas été repris.
 
-### Appeler un service
-Bouton **APPELER LA POLICE / LE MAIRE / LES POMPIERS** : choisir le service et, si on veut, un motif. L'appel (avec le nom et la position du citoyen) n'arrive qu'aux policiers et pompiers **en service**, ou au maire s'il est connecté (mod État). Si personne ne peut répondre, le citoyen est prévenu. Un appel toutes les 30 s par joueur.
+### Trois accueils (un PNJ chacun, commandes réservées à la console / OP)
+| Commande | Accueil | Contenu |
+|---|---|---|
+| `/policeaccueil <joueur>` | Commissariat | Menu ci-dessus + **APPELER LA POLICE** + prise / fin de service des policiers. |
+| `/pompieraccueil <joueur>` | Caserne | **APPELER LES POMPIERS** + prise / fin de service des pompiers / SAMU. |
+| `/mairieaccueil <joueur>` | Mairie | **APPELER LE MAIRE** (le maire n'a pas de notion de service). |
 
-### Prendre son service
-Les policiers (mod Police) et les pompiers / SAMU (mod Secours) voient en plus un bouton **PRENDRE SON SERVICE / FIN DE SERVICE** dans le même menu, équivalent à celui de leur tablette. Le maire n'a pas de notion de service.
-Nécessite la MineNorth API à jour (`setDuty`) et les mods Police / Secours à jour.
+L'appel (avec le nom et la position du citoyen, et un motif facultatif) n'arrive qu'aux policiers / pompiers **en service**, ou au maire s'il est connecté (mod État). Si personne ne peut répondre, le citoyen est prévenu. Un appel toutes les 30 s par joueur. On ne peut appeler que le service de l'accueil où l'on se trouve.
+Le bouton de service n'apparaît que pour les membres du métier (équivalent de la tablette). Nécessite la MineNorth API à jour (`setDuty`) et les mods Police / Secours à jour.
 
 ## Police
 - `/policestaff` : ouvre le bureau (plaintes, historique, rendez-vous, objets trouvés, fourrière).

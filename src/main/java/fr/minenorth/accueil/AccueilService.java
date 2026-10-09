@@ -50,7 +50,8 @@ public final class AccueilService {
     private static final int MAX = 200;
 
     /** Citoyens dont le PNJ a ouvert l'accueil, et policiers dont le bureau est ouvert. */
-    private static final Set<UUID> ACCUEIL = new HashSet<>(), DESK = new HashSet<>();
+    private static final Map<UUID, Integer> ACCUEIL = new java.util.HashMap<>();
+    private static final Set<UUID> DESK = new HashSet<>();
 
     // ------------------------------------------------------------------ outils
     private static void tell(ServerPlayer p, String text) { p.sendSystemMessage(Component.literal(text)); }
@@ -98,12 +99,24 @@ public final class AccueilService {
     }
 
     // ------------------------------------------------------------------ accueil (citoyens)
-    public static void openAccueil(ServerPlayer p) {
+    /** Accueil du commissariat (kind K_POLICE), de la caserne (K_FIRE) ou de la mairie (K_MAYOR). */
+    public static void openAccueil(ServerPlayer p, int kind) {
         List<ModNetwork.Person> players = new ArrayList<>();
-        for (ServerPlayer q : p.server.getPlayerList().getPlayers()) if (q != p) players.add(new ModNetwork.Person(q.getUUID(), display(q)));
-        players.sort(Comparator.comparing(x -> x.name().toLowerCase(Locale.ROOT)));
-        ACCUEIL.add(p.getUUID());
-        ModNetwork.send(p, new ModNetwork.AccueilPacket(players, policeDuty(p), secoursDuty(p)));
+        if (kind == ModNetwork.K_POLICE) {
+            for (ServerPlayer q : p.server.getPlayerList().getPlayers()) if (q != p) players.add(new ModNetwork.Person(q.getUUID(), display(q)));
+            players.sort(Comparator.comparing(x -> x.name().toLowerCase(Locale.ROOT)));
+        }
+        ACCUEIL.put(p.getUUID(), kind);
+        ModNetwork.send(p, new ModNetwork.AccueilPacket(kind, players, dutyState(p, kind)));
+    }
+
+    /** Service du joueur dans le métier de cet accueil (la mairie n'a pas de service). */
+    private static int dutyState(ServerPlayer p, int kind) {
+        return switch (kind) {
+            case ModNetwork.K_POLICE -> policeDuty(p);
+            case ModNetwork.K_FIRE -> secoursDuty(p);
+            default -> ModNetwork.DUTY_NONE;
+        };
     }
 
     private static int policeDuty(ServerPlayer p) {
@@ -179,9 +192,12 @@ public final class AccueilService {
     private static void citizen(ServerPlayer p, ActionPacket k) {
         if (k.action() == ModNetwork.C_CLOSE) { ACCUEIL.remove(p.getUUID()); return; }
         // Une seule action par passage au guichet, et seulement si le PNJ a ouvert le menu.
-        if (!ACCUEIL.remove(p.getUUID())) return;
+        Integer kind = ACCUEIL.remove(p.getUUID());
+        if (kind == null) return;
         MinecraftServer s = p.server;
         AccueilData d = AccueilData.get(s);
+        boolean desk = kind == ModNetwork.K_POLICE;
+        if (!desk && k.action() != ModNetwork.C_DUTY && k.action() != ModNetwork.C_CALL) return;
         switch (k.action()) {
             case ModNetwork.C_COMPLAINT -> {
                 String reason = clean(k.text());
@@ -222,9 +238,10 @@ public final class AccueilService {
                 tell(p, "§aVotre demande de rendez-vous est enregistrée. Un policier vous préviendra quand il la prendra.");
                 tellPolice(s, "§e[Accueil] " + a.citizenName + " demande un rendez-vous : " + reason + (when.isEmpty() ? "" : " (" + when + ")"));
             }
-            case ModNetwork.C_DUTY_POLICE -> duty(p, true);
-            case ModNetwork.C_DUTY_SECOURS -> duty(p, false);
-            case ModNetwork.C_CALL -> call(p, k.n(), k.text());
+            case ModNetwork.C_DUTY -> { if (kind != ModNetwork.K_MAYOR) duty(p, kind == ModNetwork.K_POLICE); }
+            // On n'appelle que le service de l'accueil où l'on se trouve.
+            case ModNetwork.C_CALL -> { if (k.n() == kind) call(p, kind, k.text()); }
+            // Les autres actions sont celles du commissariat.
             case ModNetwork.C_IMPOUND -> {
                 if (!ModList.get().isLoaded("minenorth_rp_vehicles")) { tell(p, "§cLa fourrière n'est pas disponible."); return; }
                 // Même menu que le PNJ de la fourrière du mod Véhicules.
@@ -420,7 +437,17 @@ public final class AccueilService {
         // PNJ d'accueil : réservé à la console / aux OP, les joueurs passent par le PNJ.
         d.register(Commands.literal("policeaccueil").requires(s -> s.hasPermission(2))
                 .then(Commands.argument("joueur", EntityArgument.player()).executes(c -> {
-                    openAccueil(EntityArgument.getPlayer(c, "joueur"));
+                    openAccueil(EntityArgument.getPlayer(c, "joueur"), ModNetwork.K_POLICE);
+                    return 1;
+                })));
+        d.register(Commands.literal("pompieraccueil").requires(s -> s.hasPermission(2))
+                .then(Commands.argument("joueur", EntityArgument.player()).executes(c -> {
+                    openAccueil(EntityArgument.getPlayer(c, "joueur"), ModNetwork.K_FIRE);
+                    return 1;
+                })));
+        d.register(Commands.literal("mairieaccueil").requires(s -> s.hasPermission(2))
+                .then(Commands.argument("joueur", EntityArgument.player()).executes(c -> {
+                    openAccueil(EntityArgument.getPlayer(c, "joueur"), ModNetwork.K_MAYOR);
                     return 1;
                 })));
         d.register(Commands.literal("policestaff")

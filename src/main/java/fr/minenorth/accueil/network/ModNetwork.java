@@ -22,9 +22,11 @@ public final class ModNetwork {
     /** Onglets du bureau (staff police). */
     public static final int V_COMPLAINTS = 0, V_FOUND = 1, V_IMPOUND = 2, V_HISTORY = 3, V_APPOINTMENTS = 4;
     /** Actions des citoyens (accueil). */
-    public static final int C_COMPLAINT = 1, C_IMPOUND = 2, C_DEPOSIT = 3, C_CLOSE = 4, C_APPOINTMENT = 5, C_DUTY_POLICE = 6, C_DUTY_SECOURS = 7, C_CALL = 8;
+    public static final int C_COMPLAINT = 1, C_IMPOUND = 2, C_DEPOSIT = 3, C_CLOSE = 4, C_APPOINTMENT = 5, C_DUTY = 6, C_CALL = 8;
     /** Services appelables (n de C_CALL). */
     public static final int CALL_POLICE = 0, CALL_MAYOR = 1, CALL_FIRE = 2;
+    /** Accueil ouvert : commissariat, caserne de pompiers, mairie (mêmes valeurs que CALL_*). */
+    public static final int K_POLICE = CALL_POLICE, K_MAYOR = CALL_MAYOR, K_FIRE = CALL_FIRE;
     /** Service du joueur dans l'accueil : pas membre / hors service / en service. */
     public static final int DUTY_NONE = -1, DUTY_OFF = 0, DUTY_ON = 1;
     /** Actions du bureau. */
@@ -51,10 +53,10 @@ public final class ModNetwork {
         static Person decode(FriendlyByteBuf b) { return new Person(b.readUUID(), b.readUtf()); }
     }
 
-    /** Ouvre l'accueil chez un citoyen. players = joueurs connectés contre qui il peut porter plainte ; police / secours = son service (DUTY_*). */
-    public record AccueilPacket(List<Person> players, int police, int secours) {
-        static void encode(AccueilPacket p, FriendlyByteBuf b) { b.writeCollection(p.players, Person::encode); b.writeVarInt(p.police + 1); b.writeVarInt(p.secours + 1); }
-        static AccueilPacket decode(FriendlyByteBuf b) { return new AccueilPacket(b.readList(Person::decode), b.readVarInt() - 1, b.readVarInt() - 1); }
+    /** Ouvre l'accueil chez un citoyen. kind = K_* ; players = joueurs connectés contre qui il peut porter plainte (police) ; duty = son service dans ce métier (DUTY_*). */
+    public record AccueilPacket(int kind, List<Person> players, int duty) {
+        static void encode(AccueilPacket p, FriendlyByteBuf b) { b.writeVarInt(p.kind); b.writeCollection(p.players, Person::encode); b.writeVarInt(p.duty + 1); }
+        static AccueilPacket decode(FriendlyByteBuf b) { return new AccueilPacket(b.readVarInt(), b.readList(Person::decode), b.readVarInt() - 1); }
         static void handle(AccueilPacket p, Supplier<NetworkEvent.Context> c) {
             c.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
                     () -> () -> fr.minenorth.accueil.client.ClientNetworkHandler.accueil(p)));
