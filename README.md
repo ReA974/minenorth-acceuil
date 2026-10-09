@@ -7,6 +7,13 @@ Optionnels, détectés automatiquement : Véhicules (fourrière), Identité (nom
 `/policeaccueil <joueur>` (console / OP — à donner au PNJ) : porter plainte, prendre rendez-vous avec un policier, voir ses véhicules en fourrière, déposer un objet trouvé.
 Le paiement des amendes du script n'a pas été repris.
 
+### Appeler un service
+Bouton **APPELER LA POLICE / LE MAIRE / LES POMPIERS** : choisir le service et, si on veut, un motif. L'appel (avec le nom et la position du citoyen) n'arrive qu'aux policiers et pompiers **en service**, ou au maire s'il est connecté (mod État). Si personne ne peut répondre, le citoyen est prévenu. Un appel toutes les 30 s par joueur.
+
+### Prendre son service
+Les policiers (mod Police) et les pompiers / SAMU (mod Secours) voient en plus un bouton **PRENDRE SON SERVICE / FIN DE SERVICE** dans le même menu, équivalent à celui de leur tablette. Le maire n'a pas de notion de service.
+Nécessite la MineNorth API à jour (`setDuty`) et les mods Police / Secours à jour.
+
 ## Police
 - `/policestaff` : ouvre le bureau (plaintes, historique, rendez-vous, objets trouvés, fourrière).
 - `/policestaff <joueur>` (console / OP) : ouvre le bureau chez ce joueur, pour un PNJ.

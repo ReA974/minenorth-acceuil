@@ -103,7 +103,77 @@ public final class AccueilService {
         for (ServerPlayer q : p.server.getPlayerList().getPlayers()) if (q != p) players.add(new ModNetwork.Person(q.getUUID(), display(q)));
         players.sort(Comparator.comparing(x -> x.name().toLowerCase(Locale.ROOT)));
         ACCUEIL.add(p.getUUID());
-        ModNetwork.send(p, new ModNetwork.AccueilPacket(players));
+        ModNetwork.send(p, new ModNetwork.AccueilPacket(players, policeDuty(p), secoursDuty(p)));
+    }
+
+    private static int policeDuty(ServerPlayer p) {
+        var police = fr.minenorth.api.MineNorth.police();
+        return !police.isPolice(p) ? ModNetwork.DUTY_NONE : police.onDuty(p.server, p.getUUID()) ? ModNetwork.DUTY_ON : ModNetwork.DUTY_OFF;
+    }
+
+    private static int secoursDuty(ServerPlayer p) {
+        var secours = fr.minenorth.api.MineNorth.secours();
+        return !secours.isSecours(p) ? ModNetwork.DUTY_NONE : secours.onDuty(p.server, p.getUUID()) ? ModNetwork.DUTY_ON : ModNetwork.DUTY_OFF;
+    }
+
+    // ------------------------------------------------------------------ appel d'un service
+    /** Dernier appel de chaque joueur (anti-spam). */
+    private static final Map<UUID, Long> LAST_CALL = new java.util.HashMap<>();
+    private static final long CALL_COOLDOWN_MS = 30_000L;
+
+    /** Maire connecté (mod État), sinon null. */
+    private static ServerPlayer mayor(MinecraftServer s) {
+        if (!ModList.get().isLoaded("minenorthetat")) return null;
+        try {
+            Object id = Class.forName("fr.minenorth.etat.api.EtatApi").getMethod("mayor", MinecraftServer.class).invoke(null, s);
+            return id instanceof UUID u ? s.getPlayerList().getPlayer(u) : null;
+        } catch (Throwable ignored) { return null; }
+    }
+
+    /** Appelle la police (en service), les pompiers (en service) ou le maire : le citoyen est prévenu si personne ne peut répondre. */
+    private static void call(ServerPlayer p, int service, String text) {
+        MinecraftServer s = p.server;
+        long now = System.currentTimeMillis();
+        Long last = LAST_CALL.get(p.getUUID());
+        if (last != null && now - last < CALL_COOLDOWN_MS) { tell(p, "§cVous venez d'appeler : patientez quelques secondes."); return; }
+        List<ServerPlayer> targets = new ArrayList<>();
+        String who, tag;
+        switch (service) {
+            case ModNetwork.CALL_POLICE -> {
+                who = "la police"; tag = "§9[Appel Police]";
+                for (ServerPlayer q : s.getPlayerList().getPlayers()) if (q != p && fr.minenorth.api.MineNorth.police().onDuty(s, q.getUUID())) targets.add(q);
+            }
+            case ModNetwork.CALL_FIRE -> {
+                who = "les pompiers"; tag = "§c[Appel Pompiers]";
+                for (ServerPlayer q : s.getPlayerList().getPlayers()) if (q != p && fr.minenorth.api.MineNorth.secours().onDuty(s, q.getUUID())) targets.add(q);
+            }
+            case ModNetwork.CALL_MAYOR -> {
+                who = "le maire"; tag = "§6[Appel Mairie]";
+                ServerPlayer m = mayor(s);
+                if (m != null && m != p) targets.add(m);
+            }
+            default -> { return; }
+        }
+        if (targets.isEmpty()) { tell(p, "§cPersonne n'est disponible pour répondre à votre appel (" + who + ")."); return; }
+        LAST_CALL.put(p.getUUID(), now);
+        String reason = clean(text);
+        String msg = tag + " §f" + display(p) + "§7 vous appelle à l'accueil (" + p.blockPosition().getX() + " " + p.blockPosition().getY() + " "
+                + p.blockPosition().getZ() + ")" + (reason.isEmpty() ? "." : " : §f" + reason);
+        for (ServerPlayer q : targets) tell(q, msg);
+        tell(p, "§aVotre appel a été transmis à " + who + ".");
+    }
+
+    private static void duty(ServerPlayer p, boolean police) {
+        MinecraftServer s = p.server;
+        if (police) {
+            var service = fr.minenorth.api.MineNorth.police();
+            if (!service.isPolice(p)) { tell(p, "§cVous n'êtes pas policier."); return; }
+            service.setDuty(s, p.getUUID(), !service.onDuty(s, p.getUUID()));
+        } else {
+            var service = fr.minenorth.api.MineNorth.secours();
+            if (!service.isSecours(p)) { tell(p, "§cVous n'êtes pas pompier / SAMU."); return; }
+            service.setDuty(s, p.getUUID(), !service.onDuty(s, p.getUUID()));
+        }
     }
 
     private static void citizen(ServerPlayer p, ActionPacket k) {
@@ -152,6 +222,9 @@ public final class AccueilService {
                 tell(p, "§aVotre demande de rendez-vous est enregistrée. Un policier vous préviendra quand il la prendra.");
                 tellPolice(s, "§e[Accueil] " + a.citizenName + " demande un rendez-vous : " + reason + (when.isEmpty() ? "" : " (" + when + ")"));
             }
+            case ModNetwork.C_DUTY_POLICE -> duty(p, true);
+            case ModNetwork.C_DUTY_SECOURS -> duty(p, false);
+            case ModNetwork.C_CALL -> call(p, k.n(), k.text());
             case ModNetwork.C_IMPOUND -> {
                 if (!ModList.get().isLoaded("minenorth_rp_vehicles")) { tell(p, "§cLa fourrière n'est pas disponible."); return; }
                 // Même menu que le PNJ de la fourrière du mod Véhicules.
@@ -376,6 +449,7 @@ public final class AccueilService {
     @SubscribeEvent
     public static void logout(PlayerEvent.PlayerLoggedOutEvent e) {
         ACCUEIL.remove(e.getEntity().getUUID());
+        LAST_CALL.remove(e.getEntity().getUUID());
         DESK.remove(e.getEntity().getUUID());
     }
 }

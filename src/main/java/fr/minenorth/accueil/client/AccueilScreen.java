@@ -12,8 +12,11 @@ import java.util.UUID;
 /** Accueil du commissariat (PNJ) : porter plainte, prendre rendez-vous, voir ses véhicules en fourrière, déposer un objet trouvé. */
 public class AccueilScreen extends Screen {
     private static final int W = 360, H = 240, ROWS = 4;
-    private static final int HOME = 0, COMPLAINT = 1, APPOINTMENT = 2;
+    private static final int HOME = 0, COMPLAINT = 1, APPOINTMENT = 2, CALL = 3;
     private final List<ModNetwork.Person> players;
+    private final int police, secours;
+    /** Service à appeler (ModNetwork.CALL_*), -1 = pas encore choisi. */
+    private int callService = -1;
     private int left, top, page, mode = HOME;
     /** Personne visée par la plainte : null = pas encore choisie, NONE = inconnu (plainte contre X). */
     private UUID target;
@@ -25,12 +28,19 @@ public class AccueilScreen extends Screen {
     public AccueilScreen(ModNetwork.AccueilPacket p) {
         super(Component.literal("Accueil Police"));
         this.players = p.players();
+        this.police = p.police();
+        this.secours = p.secours();
     }
 
     private void send(int action, UUID t, String text) {
         ModNetwork.CHANNEL.sendToServer(new ModNetwork.ActionPacket(action, t == null ? ModNetwork.NONE : t, text == null ? "" : text, 0));
     }
     private void act(int action, UUID t, String text) { done = true; send(action, t, text); onClose(); }
+    private void call(int service, String text) {
+        done = true;
+        ModNetwork.CHANNEL.sendToServer(new ModNetwork.ActionPacket(ModNetwork.C_CALL, ModNetwork.NONE, text == null ? "" : text, service));
+        onClose();
+    }
     private MineNorthButton btn(int x, int y, int w, int h, String label, int color, Runnable r) {
         return addRenderableWidget(new MineNorthButton(x, y, w, h, Component.literal(label), color, r));
     }
@@ -62,10 +72,41 @@ public class AccueilScreen extends Screen {
                 () -> { if (mode == HOME) onClose(); else go(() -> { mode = HOME; kReason = ""; }); });
 
         if (mode == HOME) {
-            btn(x, top + 60, w, 26, "PORTER PLAINTE", MineNorthStyle.CYAN, () -> go(() -> mode = COMPLAINT));
-            btn(x, top + 92, w, 26, "PRENDRE RENDEZ-VOUS AVEC UN POLICIER", MineNorthStyle.CYAN, () -> go(() -> mode = APPOINTMENT));
-            btn(x, top + 124, w, 26, "VOIR MES VÉHICULES EN FOURRIÈRE", MineNorthStyle.DARK, () -> act(ModNetwork.C_IMPOUND, null, ""));
-            btn(x, top + 156, w, 26, "DÉPOSER UN OBJET TROUVÉ", MineNorthStyle.DARK, () -> act(ModNetwork.C_DEPOSIT, null, ""));
+            btn(x, top + 56, w, 22, "PORTER PLAINTE", MineNorthStyle.CYAN, () -> go(() -> mode = COMPLAINT));
+            btn(x, top + 82, w, 22, "PRENDRE RENDEZ-VOUS AVEC UN POLICIER", MineNorthStyle.CYAN, () -> go(() -> mode = APPOINTMENT));
+            btn(x, top + 108, w, 22, "APPELER LA POLICE / LE MAIRE / LES POMPIERS", MineNorthStyle.PINK, () -> go(() -> { mode = CALL; callService = -1; kReason = ""; }));
+            btn(x, top + 134, w, 22, "VOIR MES VÉHICULES EN FOURRIÈRE", MineNorthStyle.DARK, () -> act(ModNetwork.C_IMPOUND, null, ""));
+            btn(x, top + 160, w, 22, "DÉPOSER UN OBJET TROUVÉ", MineNorthStyle.DARK, () -> act(ModNetwork.C_DEPOSIT, null, ""));
+            // Prise de service, seulement pour les policiers / pompiers (une moitié de ligne chacun s'ils sont les deux).
+            boolean both = police != ModNetwork.DUTY_NONE && secours != ModNetwork.DUTY_NONE;
+            int dw = both ? (w - 6) / 2 : w, dx = x;
+            if (police != ModNetwork.DUTY_NONE) {
+                boolean on = police == ModNetwork.DUTY_ON;
+                btn(dx, top + 186, dw, 22, on ? "POLICE : FIN DE SERVICE" : "POLICE : PRENDRE SON SERVICE", on ? MineNorthStyle.PINK : MineNorthStyle.GREEN,
+                        () -> act(ModNetwork.C_DUTY_POLICE, null, ""));
+                dx += dw + 6;
+            }
+            if (secours != ModNetwork.DUTY_NONE) {
+                boolean on = secours == ModNetwork.DUTY_ON;
+                btn(dx, top + 186, dw, 22, on ? "POMPIERS : FIN DE SERVICE" : "POMPIERS : PRENDRE SON SERVICE", on ? MineNorthStyle.PINK : MineNorthStyle.GREEN,
+                        () -> act(ModNetwork.C_DUTY_SECOURS, null, ""));
+            }
+            return;
+        }
+
+        if (mode == CALL) {
+            String[] names = {"POLICE", "MAIRE", "POMPIERS"};
+            int[] services = {ModNetwork.CALL_POLICE, ModNetwork.CALL_MAYOR, ModNetwork.CALL_FIRE};
+            int bw = (w - 8) / 3;
+            for (int i = 0; i < names.length; i++) {
+                final int svc = services[i];
+                btn(x + i * (bw + 4), top + 72, bw, 26, names[i], callService == svc ? MineNorthStyle.CYAN : MineNorthStyle.DARK, () -> go(() -> callService = svc));
+            }
+            bReason = box(x, top + 130, w, "Ex : agression devant l'entrée, incendie, rendez-vous urgent…", kReason, 90);
+            btn(x, top + 160, w, 22, "LANCER L'APPEL", MineNorthStyle.GREEN, () -> {
+                if (callService < 0) { go(() -> error = "Choisissez qui appeler."); return; }
+                call(callService, bReason.getValue());
+            });
             return;
         }
 
@@ -103,19 +144,23 @@ public class AccueilScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         renderBackground(g);
-        String title = mode == COMPLAINT ? "PORTER PLAINTE" : mode == APPOINTMENT ? "PRENDRE RENDEZ-VOUS" : "ACCUEIL POLICE";
+        String title = mode == COMPLAINT ? "PORTER PLAINTE" : mode == APPOINTMENT ? "PRENDRE RENDEZ-VOUS" : mode == CALL ? "APPELER UN SERVICE" : "ACCUEIL POLICE";
         MineNorthStyle.panel(g, left, top, W, H, title, "MINENORTH RP • COMMISSARIAT");
         int x = left + 14;
         if (mode == COMPLAINT) {
             g.drawString(font, players.isEmpty() ? "CONTRE QUI ? (aucun autre joueur connecté)" : "CONTRE QUI ? (joueurs connectés)", x, top + 50, MineNorthStyle.BLUE, false);
             g.drawString(font, target == null ? "RAISON" : "RAISON — plainte contre " + font.plainSubstrByWidth(targetName, 180), x, top + 152, MineNorthStyle.BLUE, false);
+        } else if (mode == CALL) {
+            g.drawString(font, "QUI VOULEZ-VOUS APPELER ?", x, top + 58, MineNorthStyle.BLUE, false);
+            g.drawString(font, "MOTIF (facultatif)", x, top + 118, MineNorthStyle.BLUE, false);
+            g.drawString(font, "Seuls les agents en service reçoivent l'appel, avec votre position.", x, top + 190, MineNorthStyle.MUTED, false);
         } else if (mode == APPOINTMENT) {
             g.drawString(font, "MOTIF DU RENDEZ-VOUS", x, top + 60, MineNorthStyle.BLUE, false);
             g.drawString(font, "VOS DISPONIBILITÉS (facultatif)", x, top + 104, MineNorthStyle.BLUE, false);
             g.drawString(font, "Un policier vous préviendra quand il prendra votre demande.", x, top + 182, MineNorthStyle.MUTED, false);
         } else {
-            g.drawString(font, "Que souhaitez-vous faire ?", x, top + 48, MineNorthStyle.TEXT, false);
-            g.drawString(font, "Objet trouvé : tenez-le en main avant de cliquer.", x, top + 190, MineNorthStyle.MUTED, false);
+            g.drawString(font, "Que souhaitez-vous faire ?", x, top + 44, MineNorthStyle.TEXT, false);
+            g.drawString(font, "Objet trouvé : tenez-le en main avant de cliquer.", x, top + 214, MineNorthStyle.MUTED, false);
         }
         if (!error.isEmpty()) g.drawString(font, error, x, top + H - 14, MineNorthStyle.ALERT, false);
         super.render(g, mx, my, pt);
