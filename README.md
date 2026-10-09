@@ -19,3 +19,9 @@ Est policier : un OP, un joueur avec le tag `police.check` (`/tag <joueur> add p
 - **Rendez-vous** : prendre une demande (le citoyen est prévenu), puis la terminer ; ou la refuser.
 - **Objets** : rendre l'objet à un joueur connecté, ou le prendre soi-même.
 Les réponses de la police arrivées pendant l'absence d'un joueur lui sont remises à sa prochaine connexion.
+
+## Licence
+
+**Tous droits réservés - MineNorthRP.** Réutilisation, copie, modification, décompilation / ingénierie
+inverse (y compris par outils d'intelligence artificielle) et utilisation pour entraîner une IA sont
+**interdites** sans autorisation écrite. Voir [LICENSE](LICENSE).
