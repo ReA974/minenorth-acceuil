@@ -41,9 +41,9 @@ public final class ModNetwork {
     private static int id = 0;
 
     public static void register() {
-        CHANNEL.registerMessage(id++, AccueilPacket.class, AccueilPacket::encode, AccueilPacket::decode, AccueilPacket::handle);
-        CHANNEL.registerMessage(id++, DeskPacket.class, DeskPacket::encode, DeskPacket::decode, DeskPacket::handle);
-        CHANNEL.registerMessage(id++, ActionPacket.class, ActionPacket::encode, ActionPacket::decode, ActionPacket::handle);
+        CHANNEL.registerMessage(id++, AccueilPacket.class, AccueilPacket::encode, AccueilPacket::decode, AccueilPacket::handle, java.util.Optional.of(net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(id++, DeskPacket.class, DeskPacket::encode, DeskPacket::decode, DeskPacket::handle, java.util.Optional.of(net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(id++, ActionPacket.class, ActionPacket::encode, ActionPacket::decode, ActionPacket::handle, java.util.Optional.of(net.minecraftforge.network.NetworkDirection.PLAY_TO_SERVER));
     }
 
     public static void send(ServerPlayer p, Object packet) { CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), packet); }
