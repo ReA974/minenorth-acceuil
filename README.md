@@ -35,3 +35,6 @@ Les réponses de la police arrivées pendant l'absence d'un joueur lui sont remi
 **Tous droits réservés - MineNorthRP.** Réutilisation, copie, modification, décompilation / ingénierie
 inverse (y compris par outils d'intelligence artificielle) et utilisation pour entraîner une IA sont
 **interdites** sans autorisation écrite. Voir [LICENSE](LICENSE).
+
+## Bureau dans le téléphone (02/11)
+Quand le bureau est demandé alors que le téléphone MRPhone est à l'écran (bouton **Bureau** de l'application Police), il s'ouvre **dans le téléphone** (`client/phone/PhoneDeskScreen` : Plaintes, Historique, Rendez-vous, Objets, Fourrière ; mêmes actions et paquets que `DeskScreen`). Sinon (bureau du commissariat, tablette) : grand écran habituel. `libs/mrphone-0.9.4.jar` en `compileOnly`, classes `client.phone` touchées seulement si `newphone` est chargé. **Non testé en jeu.**

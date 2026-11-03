@@ -14,6 +14,8 @@ public final class ClientNetworkHandler {
     public static void desk(ModNetwork.DeskPacket p) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof DeskScreen s) s.update(p);
+        // Ouvert depuis l'application Police du téléphone (téléphone à l'écran) : le bureau s'affiche dans le téléphone.
+        else if (net.minecraftforge.fml.ModList.get().isLoaded("newphone") && fr.minenorth.accueil.client.phone.PhoneDesk.handle(p)) return;
         else mc.setScreen(new DeskScreen(p));
     }
 }
